@@ -183,11 +183,13 @@ class RepoInfo(BaseModel):
 
 
 @app.get("/")
+@app.head("/")
 async def root():
     return {"message": "Java Migration Accelerator API", "version": "1.0.0"}
 
 
 @app.get("/health")
+@app.head("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 

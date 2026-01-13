@@ -104,7 +104,8 @@ class MigrationService:
             "dependencies": [],
             "source_files": 0,
             "test_files": 0,
-            "api_endpoints": []
+            "api_endpoints": [],
+            "java_files": []
         }
         
         # Check for build tool
@@ -118,7 +119,7 @@ class MigrationService:
             analysis["build_tool"] = "gradle"
             analysis.update(await self._analyze_gradle_project(gradle_path))
         
-        # Count source files
+        # Count source files from standard structure
         src_main = os.path.join(project_path, "src", "main", "java")
         src_test = os.path.join(project_path, "src", "test", "java")
         
@@ -129,7 +130,122 @@ class MigrationService:
         if os.path.exists(src_test):
             analysis["test_files"] = self._count_java_files(src_test)
         
+        # ALSO scan for standalone Java files (non-Maven/Gradle projects)
+        standalone_files = await self._scan_all_java_files(project_path)
+        if standalone_files:
+            analysis["java_files"] = standalone_files
+            # If no source files found from standard structure, use standalone count
+            if analysis["source_files"] == 0:
+                analysis["source_files"] = len(standalone_files)
+            # Detect Java version from source code if not from build file
+            if analysis["java_version"] is None:
+                analysis["java_version"] = await self._detect_java_version_from_source(standalone_files, project_path)
+            # Mark as standalone project
+            if analysis["build_tool"] is None:
+                analysis["build_tool"] = "standalone"
+        
+        # Default Java version if still not detected
+        if analysis["java_version"] is None:
+            analysis["java_version"] = "8"  # Default assumption
+        
         return analysis
+    
+    async def _scan_all_java_files(self, project_path: str) -> List[str]:
+        """Scan all Java files in the project recursively"""
+        java_files = []
+        
+        for root, dirs, files in os.walk(project_path):
+            # Skip hidden and build directories
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['target', 'build', 'out', 'node_modules', '.git']]
+            
+            for file in files:
+                if file.endswith('.java'):
+                    filepath = os.path.join(root, file)
+                    java_files.append(filepath)
+        
+        return java_files
+    
+    async def _detect_java_version_from_source(self, java_files: List[str], project_path: str) -> str:
+        """Detect Java version by analyzing source code features"""
+        detected_features = {
+            "records": False,       # Java 16+
+            "sealed": False,        # Java 17+
+            "var": False,           # Java 10+
+            "text_blocks": False,   # Java 15+
+            "switch_expr": False,   # Java 14+
+            "modules": False,       # Java 9+
+            "lambdas": False,       # Java 8+
+            "streams": False,       # Java 8+
+            "diamond": False,       # Java 7+
+            "try_resources": False, # Java 7+
+        }
+        
+        for filepath in java_files[:20]:  # Check first 20 files for performance
+            try:
+                with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    
+                    # Java 16+ features
+                    if re.search(r'\brecord\s+\w+\s*\(', content):
+                        detected_features["records"] = True
+                    
+                    # Java 17+ features
+                    if re.search(r'\bsealed\s+(class|interface)', content):
+                        detected_features["sealed"] = True
+                    if re.search(r'\bpermits\s+\w+', content):
+                        detected_features["sealed"] = True
+                    
+                    # Java 15+ features (text blocks)
+                    if '"""' in content:
+                        detected_features["text_blocks"] = True
+                    
+                    # Java 14+ features (switch expressions)
+                    if re.search(r'switch\s*\([^)]+\)\s*\{[^}]*->', content):
+                        detected_features["switch_expr"] = True
+                    
+                    # Java 10+ features
+                    if re.search(r'\bvar\s+\w+\s*=', content):
+                        detected_features["var"] = True
+                    
+                    # Java 9+ features
+                    if 'module-info.java' in filepath or re.search(r'\bmodule\s+\w+', content):
+                        detected_features["modules"] = True
+                    
+                    # Java 8+ features
+                    if re.search(r'->', content) and not detected_features["switch_expr"]:
+                        detected_features["lambdas"] = True
+                    if '.stream()' in content or '.parallelStream()' in content:
+                        detected_features["streams"] = True
+                    
+                    # Java 7+ features
+                    if re.search(r'<>', content):
+                        detected_features["diamond"] = True
+                    if re.search(r'try\s*\([^)]+\)\s*\{', content):
+                        detected_features["try_resources"] = True
+                        
+            except Exception:
+                continue
+        
+        # Determine minimum Java version based on detected features
+        if detected_features["sealed"]:
+            return "17"
+        elif detected_features["records"]:
+            return "16"
+        elif detected_features["text_blocks"]:
+            return "15"
+        elif detected_features["switch_expr"]:
+            return "14"
+        elif detected_features["var"]:
+            return "10"
+        elif detected_features["modules"]:
+            return "9"
+        elif detected_features["lambdas"] or detected_features["streams"]:
+            return "8"
+        elif detected_features["diamond"] or detected_features["try_resources"]:
+            return "7"
+        else:
+            # Default: assume older Java code needs migration
+            return "8"
     
     async def _analyze_maven_project(self, pom_path: str) -> Dict[str, Any]:
         """Analyze Maven project"""
@@ -649,6 +765,61 @@ class MigrationService:
                     content = re.sub(pattern, replacement, content)
                     fixes += 1
                     changes.append(desc)
+            
+            # ===== SCANNER AND IO IMPROVEMENTS =====
+            # Add try-with-resources hints for Scanner
+            scanner_pattern = r'Scanner\s+(\w+)\s*=\s*new\s+Scanner\s*\('
+            if re.search(scanner_pattern, content) and 'try (Scanner' not in content:
+                changes.append("Scanner should use try-with-resources")
+                fixes += 1
+            
+            # ===== EXCEPTION HANDLING IMPROVEMENTS =====
+            # Add suggestion for generic exception handling
+            if 'catch (Exception e)' in content and '// TODO:' not in content:
+                content = content.replace(
+                    'catch (Exception e) {',
+                    'catch (Exception e) { // TODO: Consider catching specific exception types'
+                )
+                changes.append("Added exception handling suggestion")
+                fixes += 1
+            
+            # Replace e.printStackTrace() with logging comment
+            if 'e.printStackTrace()' in content:
+                content = content.replace(
+                    'e.printStackTrace()',
+                    'e.printStackTrace() // TODO: Consider using proper logging (e.g., java.util.logging or SLF4J)'
+                )
+                changes.append("Added logging suggestion for printStackTrace")
+                fixes += 1
+            
+            # ===== CODE QUALITY COMMENTS =====
+            # Add Java version comment at the top if not present
+            if '// Java Version:' not in content and f'// Migrated to Java {target_version}' not in content:
+                # Find the package or first import statement
+                if 'package ' in content:
+                    content = re.sub(
+                        r'^(package\s+[^;]+;)',
+                        f'// Migrated to Java {target_version} by Java Migration Accelerator\\n\\1',
+                        content,
+                        count=1
+                    )
+                    changes.append(f"Added Java {target_version} migration comment")
+                    fixes += 1
+                elif 'import ' in content:
+                    first_import = re.search(r'^(import\s+[^;]+;)', content, re.MULTILINE)
+                    if first_import:
+                        content = content.replace(
+                            first_import.group(1),
+                            f'// Migrated to Java {target_version} by Java Migration Accelerator\\n{first_import.group(1)}',
+                            1
+                        )
+                        changes.append(f"Added Java {target_version} migration comment")
+                        fixes += 1
+                else:
+                    # Add at the very top for standalone files without package/import
+                    content = f'// Migrated to Java {target_version} by Java Migration Accelerator\\n{content}'
+                    changes.append(f"Added Java {target_version} migration comment")
+                    fixes += 1
             
             # Write back if modified
             if content != original_content:

@@ -1208,7 +1208,7 @@ def generate_migration_issues(
     if os.path.exists(src_root) and src_root not in java_dirs:
         java_dirs.append(src_root)
     
-    # Check for any java files directly in project root
+    # Check for any java files directly in project root (standalone Java files!)
     java_dirs.append(project_path)
     
     source = int(source_version)
@@ -1226,19 +1226,57 @@ def generate_migration_issues(
             (r'new Long\s*\(', "error", "Deprecated Method", "new Long() is deprecated - use Long.valueOf()"),
             (r'new Double\s*\(', "error", "Deprecated Method", "new Double() is deprecated - use Double.valueOf()"),
             (r'new Boolean\s*\(', "error", "Deprecated Method", "new Boolean() is deprecated - use Boolean.valueOf()"),
+            (r'new Float\s*\(', "error", "Deprecated Method", "new Float() is deprecated - use Float.valueOf()"),
+            (r'new Character\s*\(', "error", "Deprecated Method", "new Character() is deprecated - use Character.valueOf()"),
+            (r'new Byte\s*\(', "error", "Deprecated Method", "new Byte() is deprecated - use Byte.valueOf()"),
+            (r'new Short\s*\(', "error", "Deprecated Method", "new Short() is deprecated - use Short.valueOf()"),
             # Deprecated reflection
             (r'\.newInstance\s*\(\s*\)', "error", "Deprecated Method", "Class.newInstance() is deprecated - use getDeclaredConstructor().newInstance()"),
             # Old date/time
             (r'new Date\s*\(\s*\)', "warning", "Deprecated API", "Consider using java.time.LocalDateTime instead of java.util.Date"),
             (r'SimpleDateFormat', "warning", "Thread Safety", "SimpleDateFormat is not thread-safe - consider DateTimeFormatter"),
-            # Raw types
-            (r'List\s+\w+\s*=', "warning", "Type Safety", "Raw type usage detected - use generics List<T>"),
-            (r'Map\s+\w+\s*=', "warning", "Type Safety", "Raw type usage detected - use generics Map<K,V>"),
+            (r'java\.util\.Date', "warning", "Deprecated API", "Consider migrating to java.time API (LocalDate, LocalDateTime)"),
+            (r'java\.util\.Calendar', "warning", "Deprecated API", "Consider migrating to java.time API"),
+            # Raw types and generics
+            (r'(?<![<\w])List\s+\w+\s*=', "warning", "Type Safety", "Raw type usage detected - use generics List<T>"),
+            (r'(?<![<\w])Map\s+\w+\s*=', "warning", "Type Safety", "Raw type usage detected - use generics Map<K,V>"),
+            (r'(?<![<\w])Set\s+\w+\s*=', "warning", "Type Safety", "Raw type usage detected - use generics Set<T>"),
+            (r'(?<![<\w])ArrayList\s+\w+\s*=', "warning", "Type Safety", "Raw type usage detected - use ArrayList<T>"),
+            (r'(?<![<\w])HashMap\s+\w+\s*=', "warning", "Type Safety", "Raw type usage detected - use HashMap<K,V>"),
+            (r'(?<![<\w])HashSet\s+\w+\s*=', "warning", "Type Safety", "Raw type usage detected - use HashSet<T>"),
+            (r'(?<![<\w])Vector\s+\w+\s*=', "warning", "Type Safety", "Vector is legacy - use ArrayList<T> instead"),
+            (r'(?<![<\w])Hashtable\s+\w+\s*=', "warning", "Type Safety", "Hashtable is legacy - use HashMap<K,V> instead"),
+            # Scanner without resource management
+            (r'new Scanner\s*\([^)]*\)\s*;', "warning", "Resource Management", "Scanner should be in try-with-resources for automatic closing"),
+            # Old IO patterns
+            (r'FileInputStream|FileOutputStream|FileReader|FileWriter', "warning", "Resource Management", "Consider using try-with-resources and Files.* methods"),
+            # String concatenation issues
+            (r'\+\s*"\s*"|\"\s*"\s*\+', "info", "Performance", "Empty string concatenation detected - can be simplified"),
+            # Exception handling
+            (r'catch\s*\(\s*Exception\s+\w+\s*\)', "warning", "Code Quality", "Catching generic Exception - consider specific exception types"),
+            (r'catch\s*\(\s*Throwable\s+\w+\s*\)', "warning", "Code Quality", "Catching Throwable includes Errors - use Exception instead"),
+            (r'e\.printStackTrace\s*\(\s*\)', "warning", "Code Quality", "printStackTrace() - consider proper logging instead"),
+            # Null safety
+            (r'\.equals\s*\(\s*null\s*\)', "error", "Null Safety", ".equals(null) always false - use == null check"),
+            # Swing/AWT thread safety
+            (r'extends\s+JFrame|extends\s+JPanel', "info", "Thread Safety", "Swing component - ensure EDT usage for thread safety"),
         ]
         
         if target >= 9:
             patterns["java_version"].extend([
                 (r'sun\.misc\.', "error", "Removed Class", "sun.misc.* classes removed in Java 9+ - use standard alternatives"),
+                (r'sun\.reflect\.', "error", "Removed Class", "sun.reflect.* classes removed - use java.lang.reflect"),
+            ])
+        
+        if target >= 11:
+            patterns["java_version"].extend([
+                (r'\.trim\(\)\.isEmpty\(\)', "info", "Modern API", "Can use String.isBlank() (Java 11+) for whitespace check"),
+                (r'\.trim\(\)\.length\(\)\s*==\s*0', "info", "Modern API", "Can use String.isBlank() (Java 11+)"),
+            ])
+        
+        if target >= 17:
+            patterns["java_version"].extend([
+                (r'import\s+javax\.swing\.', "info", "Modern API", "Swing still works in Java 17, but consider JavaFX for new UIs"),
             ])
     
     if "javax_to_jakarta" in conversion_types or (target >= 17 and "java_version" in conversion_types):

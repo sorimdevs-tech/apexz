@@ -1,4 +1,5 @@
 import React from "react";
+import apexLogo from "../assets/apexfinal.png";
 
 const shellStyles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -51,12 +52,12 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div style={shellStyles.root}>
     <header style={shellStyles.header}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ fontSize: 28 }}>☕</span>
+        <img src={apexLogo} alt="Apex Logo" style={{ height: 40, width: "auto" }} />
         <span style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>Java Migration Accelerator</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <a href="https://github.com" target="_blank" rel="noopener" style={{ color: "#64748b", textDecoration: "none", fontSize: 14 }}>Documentation</a>
-        <a href="https://github.com" target="_blank" rel="noopener" style={{ color: "#64748b", textDecoration: "none", fontSize: 14 }}>GitHub</a>
+        <a href="https://github.com/sorimdevs-tech/java-migration-accelerator" target="_blank" rel="noopener" style={{ color: "#64748b", textDecoration: "none", fontSize: 14 }}>Documentation</a>
+        <a href="https://github.com/sorimdevs-tech/java-migration-accelerator" target="_blank" rel="noopener" style={{ color: "#64748b", textDecoration: "none", fontSize: 14 }}>GitHub</a>
       </div>
     </header>
 
@@ -68,8 +69,11 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 
     <footer style={shellStyles.footer}>
       <div style={shellStyles.footerContent}>
-        <span>Java Migration Accelerator v1.0</span>
-        <span>© {new Date().getFullYear()}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <img src={apexLogo} alt="Apex" style={{ height: 24, width: "auto" }} />
+          <span>Java Migration Accelerator v1.0</span>
+        </div>
+        <span>© {new Date().getFullYear()} Apex Technologies</span>
       </div>
     </footer>
   </div>

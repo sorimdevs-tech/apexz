@@ -1,6 +1,7 @@
 import React from "react";
 import Header from "./Header";
 import Footer from "./Footer";
+import apexLogo from "../assets/apexlogo.png";
 
 export default function LandingPage({ onStart }: { onStart: () => void }) {
   const styles: { [key: string]: React.CSSProperties } = {
@@ -270,7 +271,7 @@ export default function LandingPage({ onStart }: { onStart: () => void }) {
               e.currentTarget.style.transform = "translateY(0)";
             }}
           >
-            View Documentation
+            About this product
           </button>
         </div>
       </div>

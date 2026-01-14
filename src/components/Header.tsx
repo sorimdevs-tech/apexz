@@ -1,4 +1,5 @@
 import React from "react";
+import apexLogo from "../assets/apexlogo.png";
 
 interface HeaderProps {
   showBackButton?: boolean;
@@ -88,9 +89,9 @@ export default function Header({ showBackButton = false, onBackToHome }: HeaderP
   return (
     <nav style={styles.navbar}>
       <div style={styles.logoContainer}>
-        <div style={styles.logoIcon}>{ }</div>
+        <img src={apexLogo} alt="Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
         <div>
-          <p style={styles.logoText}>javaAPEX</p>
+          <p style={styles.logoText}>Java Migration Accelerator</p>
           <p style={styles.tagline}>Accelerating Java Modernization</p>
         </div>
       </div>
@@ -108,7 +109,7 @@ export default function Header({ showBackButton = false, onBackToHome }: HeaderP
           onMouseEnter={(e) => (e.currentTarget.style.color = "#3b82f6")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "#e2e8f0")}
         >
-          Documentation
+          About
         </a>
         <a
           style={styles.navLink}

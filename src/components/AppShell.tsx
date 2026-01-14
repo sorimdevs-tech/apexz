@@ -1,5 +1,5 @@
 import React from "react";
-import apexLogo from "../assets/apexfinal.png";
+import apexLogo from "../assets/javapexfinal.png";
 
 const shellStyles: { [key: string]: React.CSSProperties } = {
   root: {

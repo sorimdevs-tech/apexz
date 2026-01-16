@@ -577,16 +577,64 @@ public class UserService {
 
   const renderStepIndicator = () => (
     <div style={styles.stepIndicator}>
-      {MIGRATION_STEPS.map((s) => (
-        <div key={s.id} style={{ ...styles.stepItem, opacity: step >= s.id ? 1 : 0.5, cursor: step > s.id ? "pointer" : "default" }} onClick={() => step > s.id && setStep(s.id)}>
-          <div style={{ ...styles.stepCircle, backgroundColor: step > s.id ? "#22c55e" : step === s.id ? "#3b82f6" : "#e5e7eb", color: step >= s.id ? "#fff" : "#6b7280" }}>{step > s.id ? "✓" : s.icon}</div>
-          {step === s.id && (
-            <div style={styles.stepLabel}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>{s.description}</div>
+      {MIGRATION_STEPS.map((s, index) => (
+        <React.Fragment key={s.id}>
+          <div 
+            style={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              alignItems: "center", 
+              gap: 8,
+              opacity: 1,
+              cursor: step > s.id ? "pointer" : "default",
+              transition: "all 0.3s ease"
+            }} 
+            onClick={() => step > s.id && setStep(s.id)}
+          >
+            <div style={{ 
+              ...styles.stepCircle, 
+              backgroundColor: step > s.id ? "#22c55e" : step === s.id ? "#3b82f6" : "#e5e7eb", 
+              color: step >= s.id ? "#fff" : "#6b7280",
+              width: 44,
+              height: 44,
+              fontSize: 18,
+              boxShadow: step === s.id ? "0 0 0 4px rgba(59, 130, 246, 0.2)" : "none"
+            }}>
+              {step > s.id ? "✓" : s.icon}
             </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ 
+                fontWeight: step === s.id ? 700 : 500, 
+                fontSize: 13, 
+                color: step === s.id ? "#3b82f6" : step > s.id ? "#22c55e" : "#64748b",
+                marginBottom: 2
+              }}>
+                {s.name}
+              </div>
+              <div style={{ 
+                fontSize: 10, 
+                color: step === s.id ? "#64748b" : "#94a3b8",
+                maxWidth: 100,
+                lineHeight: 1.3
+              }}>
+                {s.description}
+              </div>
+            </div>
+          </div>
+          {/* Connector Line */}
+          {index < MIGRATION_STEPS.length - 1 && (
+            <div style={{
+              flex: 1,
+              height: 3,
+              backgroundColor: step > s.id ? "#22c55e" : "#e5e7eb",
+              marginTop: -50,
+              marginLeft: -10,
+              marginRight: -10,
+              borderRadius: 2,
+              transition: "background-color 0.3s ease"
+            }} />
           )}
-        </div>
+        </React.Fragment>
       ))}
     </div>
   );
@@ -3473,10 +3521,10 @@ const styles: { [key: string]: React.CSSProperties } = {
   container: { minHeight: "100vh", width: "100%", maxWidth: "100vw", margin: 0, padding: 0, background: "#f8fafc", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", overflow: "hidden" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 40px", width: "100%", boxSizing: "border-box", background: "#fff", borderBottom: "1px solid #e2e8f0" },
   logo: { display: "flex", alignItems: "center", gap: 12 },
-  stepIndicatorContainer: { background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "16px 40px", width: "100%", boxSizing: "border-box", overflowX: "auto" },
-  stepIndicator: { display: "flex", gap: 8, justifyContent: "center", minWidth: "fit-content", flexWrap: "nowrap" },
+  stepIndicatorContainer: { background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "24px 40px", width: "100%", boxSizing: "border-box", overflowX: "auto" },
+  stepIndicator: { display: "flex", gap: 0, justifyContent: "center", alignItems: "flex-start", minWidth: "fit-content", flexWrap: "nowrap" },
   stepItem: { display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 8, transition: "all 0.2s ease", cursor: "pointer", whiteSpace: "nowrap" },
-  stepCircle: { width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, transition: "all 0.2s ease" },
+  stepCircle: { width: 44, height: 44, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, transition: "all 0.2s ease" },
   stepLabel: { display: "flex", flexDirection: "column" },
   main: { width: "100%", maxWidth: "100vw", padding: "24px 40px", minHeight: "calc(100vh - 160px)", boxSizing: "border-box" },
   card: { background: "#fff", borderRadius: 12, padding: "28px 32px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: 20, width: "100%", boxSizing: "border-box", border: "1px solid #e2e8f0" },

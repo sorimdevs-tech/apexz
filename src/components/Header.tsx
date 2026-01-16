@@ -12,7 +12,7 @@ export default function Header({ showBackButton = false, onBackToHome }: HeaderP
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: "16px 40px",
+      padding: "12px 40px",
       borderBottom: "1px solid #1e293b",
       backgroundColor: "rgba(15, 20, 25, 0.95)",
       backdropFilter: "blur(10px)",
@@ -21,135 +21,128 @@ export default function Header({ showBackButton = false, onBackToHome }: HeaderP
     logoContainer: {
       display: "flex",
       alignItems: "center",
-      gap: 12,
-    },
-    logoIcon: {
-      fontSize: 28,
-      fontWeight: 700,
-      background: "linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)",
-      WebkitBackgroundClip: "text",
-      WebkitTextFillColor: "transparent",
-      backgroundClip: "text",
+      gap: 8,
     },
     logoText: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: 700,
       color: "#3b82f6",
       margin: 0,
     },
-    tagline: {
-      fontSize: 11,
-      color: "#64748b",
-      fontStyle: "italic",
-      margin: "2px 0 0 0",
-      fontWeight: 400,
-    },
     navLinks: {
       display: "flex",
-      gap: 30,
+      gap: 24,
       alignItems: "center",
-      flex: 1,
-      justifyContent: "center",
     },
     navLink: {
       color: "#e2e8f0",
       textDecoration: "none",
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: 500,
       cursor: "pointer",
       transition: "color 0.3s ease",
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
     },
-    ctaButton: {
+    profileButton: {
+      width: 36,
+      height: 36,
+      borderRadius: "50%",
       backgroundColor: "#3b82f6",
       color: "#fff",
-      padding: "10px 22px",
-      borderRadius: 8,
       border: "none",
-      fontWeight: 700,
       cursor: "pointer",
-      fontSize: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 16,
+      fontWeight: 600,
       transition: "all 0.3s ease",
-      boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
     },
     backButton: {
-      position: "absolute",
-      right: 40,
       backgroundColor: "#f1f5f9",
       color: "#1e293b",
       border: "1.5px solid #cbd5e1",
       borderRadius: 8,
-      padding: "10px 20px",
+      padding: "8px 16px",
       fontWeight: 600,
       cursor: "pointer",
-      fontSize: 14,
+      fontSize: 13,
       transition: "all 0.3s ease",
     },
   };
 
   return (
     <nav style={styles.navbar}>
+      {/* Logo Only */}
       <div style={styles.logoContainer}>
-        <img src={apexLogo} alt="Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-        <div>
-          <p style={styles.logoText}>Java Migration Accelerator</p>
-          <p style={styles.tagline}>Accelerating Java Modernization</p>
-        </div>
+        <img src={apexLogo} alt="Logo" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+        <p style={styles.logoText}>javaAPEX</p>
       </div>
 
+      {/* Navigation Links */}
       <div style={styles.navLinks}>
         <a
           style={styles.navLink}
           onMouseEnter={(e) => (e.currentTarget.style.color = "#3b82f6")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "#e2e8f0")}
+          href="#"
         >
-          Features
+          <span>📚</span> Documentation
         </a>
         <a
           style={styles.navLink}
           onMouseEnter={(e) => (e.currentTarget.style.color = "#3b82f6")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "#e2e8f0")}
+          href="https://github.com/sorimdevs-tech/java-migration-accelerator"
+          target="_blank"
+          rel="noreferrer"
         >
-          About
+          <span>🐙</span> GitHub
         </a>
         <a
           style={styles.navLink}
           onMouseEnter={(e) => (e.currentTarget.style.color = "#3b82f6")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "#e2e8f0")}
+          href="#"
         >
-          Support
+          <span>💖</span> Support Us
         </a>
-      </div>
-
-      {showBackButton && onBackToHome ? (
+        
+        {showBackButton && onBackToHome ? (
+          <button
+            style={styles.backButton}
+            onClick={onBackToHome}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#e2e8f0";
+              e.currentTarget.style.borderColor = "#64748b";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#f1f5f9";
+              e.currentTarget.style.borderColor = "#cbd5e1";
+            }}
+          >
+            ← Home
+          </button>
+        ) : null}
+        
+        {/* Profile Icon */}
         <button
-          style={styles.backButton}
-          onClick={onBackToHome}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#e2e8f0";
-            e.currentTarget.style.borderColor = "#64748b";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#f1f5f9";
-            e.currentTarget.style.borderColor = "#cbd5e1";
-          }}
-        >
-          ← Back to Home
-        </button>
-      ) : (
-        <button
-          style={styles.ctaButton}
+          style={styles.profileButton}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = "#2563eb";
-            e.currentTarget.style.boxShadow = "0 8px 16px rgba(59, 130, 246, 0.5)";
+            e.currentTarget.style.transform = "scale(1.05)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = "#3b82f6";
-            e.currentTarget.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.3)";
+            e.currentTarget.style.transform = "scale(1)";
           }}
+          title="Profile"
         >
-          Start Migration
+          👤
         </button>
-      )}
+      </div>
     </nav>
   );
 }

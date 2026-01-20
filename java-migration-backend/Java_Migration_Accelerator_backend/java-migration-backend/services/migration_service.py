@@ -98,7 +98,8 @@ class MigrationService:
         return recipes
     
     async def analyze_project(self, project_path: str) -> Dict[str, Any]:
-        """Analyze project structure and dependencies"""
+        """Analyze project structure and dependencies, warn if non-standard layout"""
+        print(f"[DEBUG] Analyzing project at: {project_path}")
         analysis = {
             "build_tool": None,
             "java_version": None,
@@ -106,33 +107,37 @@ class MigrationService:
             "source_files": 0,
             "test_files": 0,
             "api_endpoints": [],
-            "java_files": []
+            "java_files": [],
+            "structure_warning": None
         }
-        
+
         # Check for build tool
         pom_path = os.path.join(project_path, "pom.xml")
         gradle_path = os.path.join(project_path, "build.gradle")
-        
+
         if os.path.exists(pom_path):
             analysis["build_tool"] = "maven"
             analysis.update(await self._analyze_maven_project(pom_path))
         elif os.path.exists(gradle_path):
             analysis["build_tool"] = "gradle"
             analysis.update(await self._analyze_gradle_project(gradle_path))
-        
+
         # Count source files from standard structure
         src_main = os.path.join(project_path, "src", "main", "java")
         src_test = os.path.join(project_path, "src", "test", "java")
-        
+
+        has_standard_structure = os.path.exists(src_main) or os.path.exists(src_test)
+
         if os.path.exists(src_main):
             analysis["source_files"] = self._count_java_files(src_main)
             analysis["api_endpoints"] = await self._detect_api_endpoints(src_main)
-        
+
         if os.path.exists(src_test):
             analysis["test_files"] = self._count_java_files(src_test)
-        
+
         # ALSO scan for standalone Java files (non-Maven/Gradle projects)
         standalone_files = await self._scan_all_java_files(project_path)
+        print(f"[DEBUG] Found {len(standalone_files)} .java files: {standalone_files}")
         if standalone_files:
             analysis["java_files"] = standalone_files
             # If no source files found from standard structure, use standalone count
@@ -144,26 +149,41 @@ class MigrationService:
             # Mark as standalone project
             if analysis["build_tool"] is None:
                 analysis["build_tool"] = "standalone"
-        
+
+        # Warn if not standard structure (no pom.xml, build.gradle, or src/main/java)
+        if not (os.path.exists(pom_path) or os.path.exists(gradle_path) or os.path.exists(src_main)):
+            if analysis["source_files"] > 0:
+                analysis["structure_warning"] = (
+                    "Non-standard Java project structure detected. "
+                    "No Maven/Gradle build file or src/main/java folder found. "
+                    "Java files were found and will be processed, but migration and build steps may require manual adjustment."
+                )
+            else:
+                analysis["structure_warning"] = (
+                    "No standard Java project structure or Java files found. "
+                    "Please check your repository layout."
+                )
+
         # Default Java version if still not detected
         if analysis["java_version"] is None:
             analysis["java_version"] = "8"  # Default assumption
-        
+
         return analysis
     
     async def _scan_all_java_files(self, project_path: str) -> List[str]:
         """Scan all Java files in the project recursively"""
         java_files = []
-        
+        print(f"[DEBUG] Scanning for .java files in: {project_path}")
         for root, dirs, files in os.walk(project_path):
+            print(f"[DEBUG] Scanning directory: {root}")
             # Skip hidden and build directories
             dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['target', 'build', 'out', 'node_modules', '.git']]
-            
             for file in files:
                 if file.endswith('.java'):
                     filepath = os.path.join(root, file)
+                    print(f"[DEBUG] Found Java file: {filepath}")
                     java_files.append(filepath)
-        
+        print(f"[DEBUG] Total .java files found: {len(java_files)}")
         return java_files
     
     async def _detect_java_version_from_source(self, java_files: List[str], project_path: str) -> str:
@@ -1770,7 +1790,7 @@ class ApplicationTest {{
         # Check for build tool
         pom_path = os.path.join(project_path, "pom.xml")
         gradle_path = os.path.join(project_path, "build.gradle")
-        
+        import re
         try:
             if os.path.exists(pom_path):
                 # Run Maven tests
@@ -1782,13 +1802,18 @@ class ApplicationTest {{
                 )
                 stdout, stderr = await process.communicate()
                 result["test_output"] = stdout.decode() + stderr.decode()
-                
-                # Parse test results (simplified)
                 output = result["test_output"]
-                if "BUILD SUCCESS" in output:
-                    result["tests_passed"] = 10  # Placeholder
-                    result["tests_run"] = 10
-                    
+                # Parse Maven test summary: "Tests run: 5, Failures: 0, Errors: 0, Skipped: 0"
+                maven_summary = re.findall(r"Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)", output)
+                if maven_summary:
+                    last = maven_summary[-1]
+                    tests_run, failures, errors, skipped = map(int, last)
+                    result["tests_run"] = tests_run
+                    result["tests_failed"] = failures + errors
+                    result["tests_passed"] = tests_run - (failures + errors + skipped)
+                elif "BUILD SUCCESS" in output:
+                    result["tests_passed"] = 0
+                    result["tests_run"] = 0
             elif os.path.exists(gradle_path):
                 # Run Gradle tests
                 process = await asyncio.create_subprocess_exec(
@@ -1799,7 +1824,15 @@ class ApplicationTest {{
                 )
                 stdout, stderr = await process.communicate()
                 result["test_output"] = stdout.decode() + stderr.decode()
-                
+                output = result["test_output"]
+                # Parse Gradle test summary: "\d+ tests completed, \d+ failed"
+                gradle_summary = re.findall(r"(\d+) tests completed, (\d+) failed", output)
+                if gradle_summary:
+                    last = gradle_summary[-1]
+                    tests_run, failed = map(int, last)
+                    result["tests_run"] = tests_run
+                    result["tests_failed"] = failed
+                    result["tests_passed"] = tests_run - failed
         except Exception as e:
             result["test_output"] = f"Error running tests: {str(e)}"
         

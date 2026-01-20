@@ -14,17 +14,23 @@ import os
 import re
 from datetime import datetime, timezone
 
+
 from services.github_service import GitHubService
 from services.gitlab_service import GitLabService
 from services.migration_service import MigrationService
 from services.email_service import EmailService
 from services.sonarqube_service import SonarQubeService
+from services.auth_service import router as auth_router
+
 
 app = FastAPI(
     title="Java Migration Accelerator API",
     description="End-to-end Java 7 → Java 18 migration automation using OpenRewrite",
     version="1.0.0"
 )
+
+# Register auth router
+app.include_router(auth_router, prefix="/api")
 
 # Default GitHub token from environment variable (set in Render dashboard)
 DEFAULT_GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
@@ -226,7 +232,7 @@ async def analyze_repo_url(repo_url: str, token: str = ""):
         # Always use default token to avoid rate limits on unauthenticated requests
         effective_token = token.strip() if token and token.strip() else DEFAULT_GITHUB_TOKEN
         owner, repo = await github_service.parse_repo_url(repo_url)
-        analysis = await github_service.analyze_repository(effective_token, owner, repo)
+        analysis = await github_service.analyze_repository(effective_token, owner, repo, repo_url)
         return {
             "repo_url": repo_url,
             "owner": owner,
@@ -247,7 +253,7 @@ async def list_repo_files(repo_url: str, token: str = "", path: str = ""):
         # Always use default token to avoid rate limits
         effective_token = token.strip() if token and token.strip() else DEFAULT_GITHUB_TOKEN
         owner, repo = await github_service.parse_repo_url(repo_url)
-        files = await github_service.list_repo_files(effective_token, owner, repo, path)
+        files = await github_service.list_repo_files(effective_token, owner, repo, path, repo_url)
         return {
             "repo_url": repo_url,
             "owner": owner,

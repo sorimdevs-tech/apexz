@@ -262,6 +262,22 @@ export default function LandingPage({ onStart }: { onStart: () => void }) {
           </button>
           <button
             style={styles.secondaryBtn}
+            onClick={() => {
+              window.location.href = 'http://localhost:8001/api/auth/github/login';
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            Login with GitHub
+          </button>
+          <button
+            style={styles.secondaryBtn}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
               e.currentTarget.style.transform = "translateY(-2px)";

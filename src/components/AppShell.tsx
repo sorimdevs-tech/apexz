@@ -288,6 +288,9 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                           cursor: "pointer",
                           transition: "all 0.2s ease"
                         }}
+                        onClick={() => {
+                          window.location.href = 'http://localhost:8001/api/auth/github/login';
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = "#1e293b";
                           e.currentTarget.style.color = "#fff";

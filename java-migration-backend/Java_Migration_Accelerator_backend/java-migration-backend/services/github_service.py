@@ -1,3 +1,20 @@
+def get_github_client(token: str, repo_url: str = None):
+    """Return a Github client for public or enterprise GitHub."""
+    from github import Github
+    import re
+    if repo_url and "github.com" in repo_url and not "github." in repo_url.replace("github.com", ""):
+        # Public GitHub
+        return Github(token)
+    elif repo_url:
+        # Enterprise (extract base domain)
+        m = re.match(r"https?://([^/]+)/", repo_url)
+        if m:
+            base_url = f"https://{m.group(1)}/api/v3"
+            return Github(base_url=base_url, login_or_token=token)
+        else:
+            raise Exception("Invalid GitHub Enterprise URL")
+    else:
+        return Github(token)
 """
 Git Service - Handles GitHub and GitLab API interactions
 """
@@ -35,13 +52,13 @@ class GitHubService:
         self.work_dir = os.getenv("WORK_DIR", tempfile.gettempdir() + "/migrations")
         os.makedirs(self.work_dir, exist_ok=True)
     
-    async def list_repositories(self, token: str) -> List[Dict[str, Any]]:
+    async def list_repositories(self, token: str, repo_url: str = None) -> List[Dict[str, Any]]:
         """List all repositories accessible with the token"""
         try:
             if not token or len(token) < 10:
                 raise Exception("Invalid GitHub token format")
             
-            g = Github(token)
+            g = get_github_client(token, repo_url)
             user = g.get_user()
             
             # Test authentication by accessing login
@@ -67,7 +84,7 @@ class GitHubService:
         except Exception as e:
             raise Exception(f"Failed to connect to GitHub: {str(e)}")
     
-    async def analyze_repository(self, token: str, owner: str, repo: str) -> Dict[str, Any]:
+    async def analyze_repository(self, token: str, owner: str, repo: str, repo_url: str = None) -> Dict[str, Any]:
         """Analyze a repository to detect Java version, build tool, and structure"""
         cache_key = f"analysis:{owner}/{repo}"
         
@@ -80,9 +97,9 @@ class GitHubService:
         try:
             # Allow public repo analysis without token
             if token and len(token.strip()) > 0:
-                g = Github(token.strip(), retry=3, per_page=30)
+                g = get_github_client(token.strip(), repo_url)
             else:
-                g = Github(retry=3, per_page=30)
+                g = get_github_client(None, repo_url)
             
             # Check rate limit before making requests
             rate_limit = g.get_rate_limit()
@@ -166,16 +183,20 @@ class GitHubService:
     async def parse_repo_url(self, repo_url: str) -> tuple:
         """Parse GitHub URL to extract owner and repo name"""
         import re
-        # Handle various GitHub URL formats
+        # Accept github.com, github.<enterprise>.com, and owner/repo
         patterns = [
-            r'github\.com[:/]+([^/]+)/([^/\s]+)',  # https://github.com/owner/repo or github.com/owner/repo
+            r'github(\.[^/]+)?\.com[:/]+([^/]+)/([^/\s]+)',  # https://github.com/owner/repo or github.enterprise.com/owner/repo
             r'^([^/]+)/([^/]+)$',  # owner/repo format
         ]
         for pattern in patterns:
             match = re.search(pattern, repo_url)
             if match:
-                return match.group(1), match.group(2).replace('.git', '')
-        raise Exception("Invalid GitHub repository URL. Use format: owner/repo or https://github.com/owner/repo")
+                # For enterprise, owner/repo is always last two groups
+                if 'github' in pattern:
+                    return match.group(2), match.group(3).replace('.git', '')
+                else:
+                    return match.group(1), match.group(2).replace('.git', '')
+        raise Exception("Invalid GitHub repository URL. Use format: owner/repo, https://github.com/owner/repo, or https://github.<enterprise>.com/owner/repo")
     
     async def get_repo_info(self, token: str, owner: str, repo: str) -> Dict[str, Any]:
         """Get repository information (works with or without token for public repos)"""
@@ -203,7 +224,7 @@ class GitHubService:
         except Exception as e:
             raise Exception(f"Failed to get repository info: {str(e)}")
     
-    async def list_repo_files(self, token: str, owner: str, repo: str, path: str = "") -> List[Dict[str, Any]]:
+    async def list_repo_files(self, token: str, owner: str, repo: str, path: str = "", repo_url: str = None) -> List[Dict[str, Any]]:
         """List all files and directories in a repository"""
         cache_key = f"files:{owner}/{repo}:{path}"
         
@@ -215,9 +236,9 @@ class GitHubService:
         
         try:
             if token and len(token.strip()) > 0:
-                g = Github(token.strip(), retry=3)
+                g = get_github_client(token.strip(), repo_url)
             else:
-                g = Github(retry=3)
+                g = get_github_client(None, repo_url)
             
             # Check rate limit
             rate_limit = g.get_rate_limit()

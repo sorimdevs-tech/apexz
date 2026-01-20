@@ -71,6 +71,12 @@ export default function MigrationWizard({ onBackToHome }: { onBackToHome?: () =>
   const [repos, setRepos] = useState<RepoInfo[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<RepoInfo | null>(null);
   const [githubToken, setGithubToken] = useState("");
+  // Show token input only for GitHub Enterprise
+  const isEnterpriseGithub = (url: string) => {
+    // Matches github.<anything>.com but not github.com
+    const match = url.match(/^https?:\/\/(www\.)?github\.([^.]+)\.com\//i);
+    return match && match[2] !== "" && match[2] !== "com";
+  };
   const [repoAnalysis, setRepoAnalysis] = useState<RepoAnalysis | null>(null);
   const [repoFiles, setRepoFiles] = useState<RepoFile[]>([]);
   const [currentPath, setCurrentPath] = useState("");
@@ -174,7 +180,9 @@ export default function MigrationWizard({ onBackToHome }: { onBackToHome?: () =>
         .then((analysis) => {
           setRepoAnalysis(analysis);
           // Check if it's a Java project
+          // Consider as Java project if any .java files are found (even if no build file or version is detected)
           const hasJavaIndicators = 
+            (Array.isArray(analysis.java_files) && analysis.java_files.length > 0) ||
             analysis.java_version !== "unknown" && analysis.java_version !== null ||
             analysis.build_tool === "maven" || analysis.build_tool === "gradle" ||
             analysis.structure?.has_pom_xml || analysis.structure?.has_build_gradle ||
@@ -689,11 +697,12 @@ public class UserService {
     // Remove .git extension
     normalized = normalized.replace(/\.git$/, '');
 
-    // Check if it's a valid format
-    const isGithubUrl = /^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/\s]+$/.test(normalized);
+    // Accept github.com, gitlab.com, and any github.<custom>.com (enterprise)
+    const isGithubUrl = /^https?:\/\/(www\.)?github(\.[^/]+)?\.com\/[^/]+\/[^/\s]+$/.test(normalized);
+    const isGitlabUrl = /^https?:\/\/(www\.)?gitlab\.com\/[^/]+\/[^/\s]+$/.test(normalized);
     const isShortFormat = /^[^/]+\/[^/\s]+$/.test(normalized);
 
-    if (isGithubUrl || isShortFormat) {
+    if (isGithubUrl || isGitlabUrl || isShortFormat) {
       if (url !== normalized) {
         return { 
           valid: true, 
@@ -707,139 +716,155 @@ public class UserService {
     return { 
       valid: false, 
       normalizedUrl: "", 
-      message: "Invalid URL format. Use: https://github.com/owner/repo or owner/repo" 
+      message: "Invalid URL format. Use: https://github.com/owner/repo, https://github.<enterprise>.com/owner/repo, or owner/repo" 
     };
   };
 
   const renderStep1 = () => {
     const urlValidation = repoUrl ? normalizeGithubUrl(repoUrl) : { valid: false, normalizedUrl: "", message: "" };
-    
+    const showEnterpriseToken = repoUrl && isEnterpriseGithub(urlValidation.normalizedUrl || repoUrl);
     return (
-    <div style={styles.card}>
-      <div style={styles.stepHeader}>
-        <span style={styles.stepIcon}>🔗</span>
-        <div>
-          <h2 style={styles.title}>Connect Repository</h2>
-          <p style={styles.subtitle}>Enter a GitHub repository URL to start migration analysis.</p>
+      <div style={styles.card}>
+        <div style={styles.stepHeader}>
+          <span style={styles.stepIcon}>🔗</span>
+          <div>
+            <h2 style={styles.title}>Connect Repository</h2>
+            <p style={styles.subtitle}>Enter a GitHub repository URL to start migration analysis.</p>
+          </div>
+        </div>
+
+        <div style={styles.field}>
+          <label style={{ ...styles.label, display: "flex", alignItems: "center", gap: 8 }}>
+            Repository URL
+            {/* Info Button with Tooltip */}
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  backgroundColor: "#e2e8f0",
+                  color: "#64748b",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "help",
+                  transition: "all 0.2s ease"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#3b82f6";
+                  e.currentTarget.style.color = "#fff";
+                  const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (tooltip) tooltip.style.display = "block";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#e2e8f0";
+                  e.currentTarget.style.color = "#64748b";
+                  const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (tooltip) tooltip.style.display = "none";
+                }}
+              >
+                i
+              </span>
+              {/* Tooltip */}
+              <div
+                style={{
+                  display: "none",
+                  position: "absolute",
+                  top: 24,
+                  left: 0,
+                  backgroundColor: "#1e293b",
+                  color: "#fff",
+                  padding: "12px 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                  whiteSpace: "nowrap",
+                  zIndex: 1000,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 6, color: "#94a3b8" }}>Supported formats:</div>
+                <div>• https://github.com/owner/repo</div>
+                <div>• github.com/owner/repo</div>
+                <div>• owner/repo</div>
+                {/* Arrow */}
+                <div style={{
+                  position: "absolute",
+                  top: -6,
+                  left: 9,
+                  width: 0,
+                  height: 0,
+                  borderLeft: "6px solid transparent",
+                  borderRight: "6px solid transparent",
+                  borderBottom: "6px solid #1e293b"
+                }} />
+              </div>
+            </div>
+          </label>
+          <input
+            type="text"
+            style={{ ...styles.input, borderColor: urlValidation.valid ? '#22c55e' : repoUrl ? '#ef4444' : '#e2e8f0' }}
+            value={repoUrl}
+            onChange={(e) => {
+              setRepoUrl(e.target.value);
+              setSelectedRepo(null);
+              setRepoAnalysis(null);
+            }}
+            placeholder="https://github.com/owner/repository"
+          />
+          {showEnterpriseToken && (
+            <div style={{ marginTop: 16 }}>
+              <label style={{ ...styles.label, fontWeight: 500 }}>Personal Access Token (required for GitHub Enterprise)</label>
+              <input
+                type="password"
+                style={{ ...styles.input, borderColor: githubToken ? '#22c55e' : '#e2e8f0' }}
+                value={githubToken}
+                onChange={e => setGithubToken(e.target.value)}
+                placeholder="Paste your GitHub Enterprise PAT here"
+                autoComplete="off"
+              />
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                Required for private/enterprise repos. <a href="https://docs.github.com/en/enterprise-server@3.0/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token" target="_blank" rel="noopener noreferrer">How to create a PAT?</a>
+              </div>
+            </div>
+          )}
+          {repoUrl && !urlValidation.valid && (
+            <div style={{ fontSize: 12, color: '#ef4444', marginTop: 6 }}>
+              ⚠️ {urlValidation.message}
+            </div>
+          )}
+          {urlValidation.valid && (
+            <div style={{ fontSize: 12, color: '#22c55e', marginTop: 6 }}>
+              ✓ Valid repository URL
+            </div>
+          )}
+        </div>
+
+        <div style={styles.btnRow}>
+          <button
+            style={{ ...styles.primaryBtn, opacity: !urlValidation.valid ? 0.5 : 1 }}
+            disabled={!urlValidation.valid}
+            onClick={() => {
+              if (urlValidation.valid) {
+                setSelectedRepo({
+                  name: urlValidation.normalizedUrl.split('/').pop() || "",
+                  full_name: urlValidation.normalizedUrl.replace('https://github.com/', ''),
+                  url: urlValidation.normalizedUrl,
+                  default_branch: "main",
+                  language: "Java",
+                  description: ""
+                });
+                setStep(2);
+              }
+            }}
+          >
+            Continue →
+          </button>
         </div>
       </div>
-
-      <div style={styles.field}>
-        <label style={{ ...styles.label, display: "flex", alignItems: "center", gap: 8 }}>
-          Repository URL
-          {/* Info Button with Tooltip */}
-          <div style={{ position: "relative", display: "inline-block" }}>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 18,
-                height: 18,
-                borderRadius: "50%",
-                backgroundColor: "#e2e8f0",
-                color: "#64748b",
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: "help",
-                transition: "all 0.2s ease"
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#3b82f6";
-                e.currentTarget.style.color = "#fff";
-                const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
-                if (tooltip) tooltip.style.display = "block";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#e2e8f0";
-                e.currentTarget.style.color = "#64748b";
-                const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
-                if (tooltip) tooltip.style.display = "none";
-              }}
-            >
-              i
-            </span>
-            {/* Tooltip */}
-            <div
-              style={{
-                display: "none",
-                position: "absolute",
-                top: 24,
-                left: 0,
-                backgroundColor: "#1e293b",
-                color: "#fff",
-                padding: "12px 16px",
-                borderRadius: 8,
-                fontSize: 12,
-                lineHeight: 1.6,
-                whiteSpace: "nowrap",
-                zIndex: 1000,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
-              }}
-            >
-              <div style={{ fontWeight: 600, marginBottom: 6, color: "#94a3b8" }}>Supported formats:</div>
-              <div>• https://github.com/owner/repo</div>
-              <div>• github.com/owner/repo</div>
-              <div>• owner/repo</div>
-              {/* Arrow */}
-              <div style={{
-                position: "absolute",
-                top: -6,
-                left: 9,
-                width: 0,
-                height: 0,
-                borderLeft: "6px solid transparent",
-                borderRight: "6px solid transparent",
-                borderBottom: "6px solid #1e293b"
-              }} />
-            </div>
-          </div>
-        </label>
-        <input
-          type="text"
-          style={{ ...styles.input, borderColor: urlValidation.valid ? '#22c55e' : repoUrl ? '#ef4444' : '#e2e8f0' }}
-          value={repoUrl}
-          onChange={(e) => {
-            setRepoUrl(e.target.value);
-            setSelectedRepo(null);
-            setRepoAnalysis(null);
-          }}
-          placeholder="https://github.com/owner/repository"
-        />
-        {repoUrl && !urlValidation.valid && (
-          <div style={{ fontSize: 12, color: '#ef4444', marginTop: 6 }}>
-            ⚠️ {urlValidation.message}
-          </div>
-        )}
-        {urlValidation.valid && (
-          <div style={{ fontSize: 12, color: '#22c55e', marginTop: 6 }}>
-            ✓ Valid repository URL
-          </div>
-        )}
-      </div>
-
-      <div style={styles.btnRow}>
-        <button
-          style={{ ...styles.primaryBtn, opacity: !urlValidation.valid ? 0.5 : 1 }}
-          disabled={!urlValidation.valid}
-          onClick={() => {
-            if (urlValidation.valid) {
-              setSelectedRepo({
-                name: urlValidation.normalizedUrl.split('/').pop() || "",
-                full_name: urlValidation.normalizedUrl.replace('https://github.com/', ''),
-                url: urlValidation.normalizedUrl,
-                default_branch: "main",
-                language: "Java",
-                description: ""
-              });
-              setStep(2);
-            }
-          }}
-        >
-          Continue →
-        </button>
-      </div>
-    </div>
     );
   };
 
@@ -957,8 +982,8 @@ public class UserService {
         <>
           {loading ? <div style={styles.loadingBox}><div style={styles.spinner}></div><span>Analyzing repository...</span></div> : (
             <>
-              {/* Not a Java Project Alert */}
-              {isJavaProject === false && (
+              {/* Not a Java Project Alert or No Framework Detected */}
+              {isJavaProject === false ? (
                 <div style={{
                   background: "#fef2f2",
                   border: "2px solid #ef4444",
@@ -1003,6 +1028,50 @@ public class UserService {
                       ← Connect Different Repository
                     </button>
                   </div>
+                </div>
+              ) : null}
+
+              {/* Java project but no framework detected */}
+              {isJavaProject && detectedFrameworks.length === 0 && (
+                <div style={{
+                  background: "#fef9c3",
+                  border: "2px solid #facc15",
+                  borderRadius: 12,
+                  padding: 20,
+                  marginBottom: 24,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 16
+                }}>
+                  <span style={{ fontSize: 32 }}>ℹ️</span>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#92400e", marginBottom: 8 }}>
+                      Java Project Detected (No Framework)
+                    </div>
+                    <div style={{ fontSize: 14, color: "#a16207", lineHeight: 1.6 }}>
+                      This repository contains Java source files but no recognized framework (e.g., Spring, Spring Boot, Jakarta EE) was detected. You can still proceed with migration, but some automation features may be limited.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Show repo file structure if Java project */}
+              {isJavaProject && repoFiles && repoFiles.length > 0 && (
+                <div style={{
+                  background: "#f1f5f9",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  padding: 16,
+                  marginBottom: 24
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: "#334155" }}>Repository File Structure</div>
+                  <ul style={{ fontFamily: 'monospace', fontSize: 14, margin: 0, paddingLeft: 20 }}>
+                    {repoFiles.map((file, idx) => (
+                      <li key={idx} style={{ color: file.type === 'dir' ? '#0ea5e9' : '#64748b' }}>
+                        {file.type === 'dir' ? '📁' : '📄'} {file.name}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 

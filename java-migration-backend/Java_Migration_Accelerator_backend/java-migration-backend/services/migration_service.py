@@ -1206,14 +1206,26 @@ application-*.yml
 """
     
     def _generate_readme(self, project_name: str, package_name: str, java_version: str) -> str:
-        """Generate a professional README.md"""
+        """Generate a professional README.md for migrated projects"""
+        from datetime import datetime
+
+        migration_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+
         return f"""# {project_name.replace('-', ' ').title()}
 
-> Migrated to Java {java_version} by Java Migration Accelerator
+> 🚀 **Java Apex Migration Project** - Migrated to Java {java_version} on {migration_time}
 
 ## 📋 Overview
 
-This project has been automatically migrated and restructured to follow standard Maven project conventions.
+This project has been automatically migrated and restructured to follow standard Maven project conventions using **Java Apex Migration Accelerator**.
+
+## 🔄 Migration Information
+
+- **Migration Tool**: Java Apex Migration Accelerator
+- **Migration Date**: {migration_time}
+- **Source Version**: Unknown (auto-detected during migration)
+- **Target Version**: Java {java_version}
+- **Migration Type**: High-risk project restructuring with standard Maven layout
 
 ## 🛠️ Requirements
 
@@ -1717,33 +1729,12 @@ class ApplicationTest {{
                 fixes += 1
             
             # ===== CODE QUALITY COMMENTS =====
-            # Add Java version comment at the top if not present
-            if '// Java Version:' not in content and f'// Migrated to Java {target_version}' not in content:
-                # Find the package or first import statement
-                if 'package ' in content:
-                    content = re.sub(
-                        r'^(package\s+[^;]+;)',
-                        f'// Migrated to Java {target_version} by Java Migration Accelerator\\n\\1',
-                        content,
-                        count=1
-                    )
-                    changes.append(f"Added Java {target_version} migration comment")
-                    fixes += 1
-                elif 'import ' in content:
-                    first_import = re.search(r'^(import\s+[^;]+;)', content, re.MULTILINE)
-                    if first_import:
-                        content = content.replace(
-                            first_import.group(1),
-                            f'// Migrated to Java {target_version} by Java Migration Accelerator\\n{first_import.group(1)}',
-                            1
-                        )
-                        changes.append(f"Added Java {target_version} migration comment")
-                        fixes += 1
-                else:
-                    # Add at the very top for standalone files without package/import
-                    content = f'// Migrated to Java {target_version} by Java Migration Accelerator\\n{content}'
-                    changes.append(f"Added Java {target_version} migration comment")
-                    fixes += 1
+            # Only add Java version comment to README.md files, not to source code files
+            if file.lower().endswith('readme.md') and f'// Migrated to Java {target_version}' not in content:
+                # Add migration comment at the top of README files only
+                content = f'<!-- Migrated to Java {target_version} by Java Migration Accelerator -->\n\n{content}'
+                changes.append(f"Added Java {target_version} migration comment to README.md")
+                fixes += 1
             
             # Write back if modified
             if content != original_content:

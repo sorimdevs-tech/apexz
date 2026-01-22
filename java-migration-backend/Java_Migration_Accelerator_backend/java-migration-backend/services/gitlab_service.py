@@ -11,7 +11,7 @@ import httpx
 
 class GitLabService:
     def __init__(self):
-        self.work_dir = os.getenv("WORK_DIR", tempfile.gettempdir() + "/migrations")
+        self.work_dir = os.getenv("WORK_DIR", os.path.join(tempfile.gettempdir(), "migrations"))
         self.gitlab_url = os.getenv("GITLAB_URL", "https://gitlab.com")
         self.api_base_url = f"{self.gitlab_url}/api/v4"
         os.makedirs(self.work_dir, exist_ok=True)

@@ -49,7 +49,7 @@ def set_cached(key: str, value: Any):
 
 class GitHubService:
     def __init__(self):
-        self.work_dir = os.getenv("WORK_DIR", tempfile.gettempdir() + "/migrations")
+        self.work_dir = os.getenv("WORK_DIR", os.path.join(tempfile.gettempdir(), "migrations"))
         os.makedirs(self.work_dir, exist_ok=True)
     
     async def list_repositories(self, token: str, repo_url: str = None) -> List[Dict[str, Any]]:

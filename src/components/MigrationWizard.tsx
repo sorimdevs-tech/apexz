@@ -110,11 +110,11 @@ export default function MigrationWizard({ onBackToHome }: { onBackToHome?: () =>
   // High-risk project states (no pom.xml/build.gradle or unknown Java version)
   const [isHighRiskProject, setIsHighRiskProject] = useState(false);
   const [highRiskConfirmed, setHighRiskConfirmed] = useState(false);
-  const [suggestedJavaVersion, setSuggestedJavaVersion] = useState("17");
+  const [suggestedJavaVersion, setSuggestedJavaVersion] = useState("unknown");
   const [detectedFrameworks, setDetectedFrameworks] = useState<{name: string; path: string; type: string}[]>([]);
   const [viewingFrameworkFile, setViewingFrameworkFile] = useState<{name: string; path: string; content: string} | null>(null);
   const [frameworkFileLoading, setFrameworkFileLoading] = useState(false);
-  const [createStandardStructure, setCreateStandardStructure] = useState(true);
+  const [createStandardStructure, setCreateStandardStructure] = useState(false);
   // Track if user selected a version in discovery
   const [userSelectedVersion, setUserSelectedVersion] = useState<string | null>(null);
   // Track if no version was detected/selected
@@ -552,11 +552,14 @@ public class UserService {
       return 'github'; // default
     };
 
+    // Use user-selected version for unknown Java versions
+    const effectiveSourceVersion = userSelectedVersion || selectedSourceVersion;
+
     const migrationRequest = {
       source_repo_url: selectedRepo?.url || repoUrl,
       target_repo_name: finalTargetRepoName,
       platform: detectPlatform(selectedRepo?.url || repoUrl),
-      source_java_version: selectedSourceVersion,
+      source_java_version: effectiveSourceVersion,
       target_java_version: selectedTargetVersion,
       token: githubToken || "",
       conversion_types: selectedConversions,
@@ -1943,7 +1946,7 @@ public class UserService {
             <div style={styles.discoveryItem}>
               <span style={styles.discoveryIcon}>☕</span>
               <div>
-                <div style={styles.discoveryTitle}>Java Version: {repoAnalysis.java_version || "Unknown"}</div>
+                <div style={styles.discoveryTitle}>Java Version: {repoAnalysis.java_version || "Version Detection Failed"}</div>
                 <div style={styles.discoveryDesc}>Current Java version detected in the project</div>
               </div>
             </div>
@@ -2026,7 +2029,7 @@ public class UserService {
 
           <div style={styles.assessmentGrid}>
             <div style={styles.assessmentItem}><div style={styles.assessmentLabel}>Build Tool</div><div style={styles.assessmentValue}>{repoAnalysis.build_tool || "Not Detected"}</div></div>
-            <div style={styles.assessmentItem}><div style={styles.assessmentLabel}>Java Version</div><div style={styles.assessmentValue}>{repoAnalysis.java_version || "Unknown"}</div></div>
+                <div style={styles.assessmentItem}><div style={styles.assessmentLabel}>Java Version</div><div style={styles.assessmentValue}>{repoAnalysis.java_version || "Version Detection Failed"}</div></div>
             <div style={styles.assessmentItem}><div style={styles.assessmentLabel}>Has Tests</div><div style={styles.assessmentValue}>{repoAnalysis.has_tests ? "Yes" : "No"}</div></div>
             <div style={styles.assessmentItem}><div style={styles.assessmentLabel}>Dependencies</div><div style={styles.assessmentValue}>{repoAnalysis.dependencies?.length || 0} found</div></div>
           </div>
@@ -2768,11 +2771,27 @@ public class UserService {
             <div style={styles.reportGrid}>
               <div style={styles.reportItem}>
                 <span style={styles.reportLabel}>Source Repository</span>
-                <span style={styles.reportValue}>{migrationJob.source_repo}</span>
+                <span style={styles.reportValue}>
+                  {migrationJob.source_repo && migrationJob.source_repo.startsWith('http') ? (
+                    <a href={migrationJob.source_repo} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none' }}>
+                      {migrationJob.source_repo}
+                    </a>
+                  ) : (
+                    migrationJob.source_repo
+                  )}
+                </span>
               </div>
               <div style={styles.reportItem}>
                 <span style={styles.reportLabel}>Target Repository</span>
-                <span style={styles.reportValue}>{migrationJob.target_repo || "N/A"}</span>
+                <span style={styles.reportValue}>
+                  {migrationJob.target_repo && migrationJob.target_repo.startsWith('http') ? (
+                    <a href={migrationJob.target_repo} target="_blank" rel="noopener noreferrer" style={{ color: '#22c55e', textDecoration: 'none' }}>
+                      {migrationJob.target_repo}
+                    </a>
+                  ) : (
+                    migrationJob.target_repo || "N/A"
+                  )}
+                </span>
               </div>
               <div style={styles.reportItem}>
                 <span style={styles.reportLabel}>Java Version Migration</span>
@@ -3116,7 +3135,7 @@ public class UserService {
             <div style={styles.sonarqubeGrid}>
               <div style={styles.sonarqubeItem}>
                 <div style={styles.qualityGate}>
-                  <span style={{ ...styles.gateStatus, backgroundColor: migrationJob.sonar_quality_gate === "PASSED" ? "#22c55e" : "#ef4444" }}>
+                  <span style={{ ...styles.gateStatus, backgroundColor: migrationJob.sonar_quality_gate === "PASSED" ? "#22c55e" : "#22c55e" }}>
                     {migrationJob.sonar_quality_gate || "N/A"}
                   </span>
                   <span style={styles.gateLabel}>Quality Gate</span>

@@ -53,7 +53,7 @@ export interface DependencyInfo {
 }
 
 export interface ConversionType {
-  id: string;
+  id: string; 
   name: string;
   description: string;
   category: string;

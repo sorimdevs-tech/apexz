@@ -10,13 +10,15 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies (with retry for reliability)
+RUN apt-get update -y || apt-get update -y || true
+RUN apt-get install -y --no-install-recommends \
     git \
     curl \
     openjdk-17-jdk \
     maven \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Copy backend files
 COPY java-migration-backend/Java_Migration_Accelerator_backend/java-migration-backend/requirements.txt .

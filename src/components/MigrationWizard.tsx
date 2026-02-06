@@ -2320,60 +2320,31 @@ public class UserService {
         <div style={styles.row}>
             <div style={styles.field}>
               <label style={styles.label}>Source Java Version</label>
-              <div style={{
-                padding: "12px 14px",
-                fontSize: 14,
-                borderRadius: 8,
-                border: "1px solid #d1d5db",
-                backgroundColor: "#f9fafb",
-                color: userSelectedVersion ? "#1e293b" : "#6b7280",
-                fontWeight: userSelectedVersion ? 600 : 500
-              }}>
-                {userSelectedVersion
-                  ? `Java ${selectedSourceVersion} (manually selected)`
-                  : (repoAnalysis?.java_version && repoAnalysis?.java_version !== "unknown"
-                      ? `Java ${repoAnalysis.java_version} (detected)`
-                      : "Source don't have a java version")
-                }
-              </div>
+              <select
+                value={selectedSourceVersion}
+                onChange={(e) => {
+                  setSelectedSourceVersion(e.target.value);
+                  setUserSelectedVersion(e.target.value); // Mark as user-selected
+                }}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #d97706",
+                  fontSize: 14,
+                  backgroundColor: "#fff",
+                  cursor: "pointer",
+                  width: "100%"
+                }}
+              >
+                <option value="7">Java 7 (Legacy)</option>
+                <option value="8">Java 8 (LTS)</option>
+                <option value="11">Java 11 (LTS)</option>
+                <option value="17">Java 17 (LTS)</option>
+                <option value="21">Java 21 (LTS)</option>
+              </select>
               <p style={styles.helpText}>
-                {userSelectedVersion
-                  ? "Source version manually selected in discovery step"
-                  : (repoAnalysis?.java_version && repoAnalysis?.java_version !== "unknown"
-                      ? "Java version detected from build configuration"
-                      : "No Java version found - please select a source version below")
-                }
+                💡 Select the source Java version to migrate from. Detected: {repoAnalysis?.java_version || "unknown"}
               </p>
-              {/* Show version selector when not detected */}
-              {!userSelectedVersion && (!repoAnalysis?.java_version || repoAnalysis?.java_version === "unknown") && (
-                <div style={{ marginTop: 12 }}>
-                  <select
-                    value={selectedSourceVersion}
-                    onChange={(e) => {
-                      setSelectedSourceVersion(e.target.value);
-                      setUserSelectedVersion(e.target.value); // Mark as user-selected
-                    }}
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: 6,
-                      border: "1px solid #d97706",
-                      fontSize: 14,
-                      backgroundColor: "#fff",
-                      cursor: "pointer",
-                      width: "100%"
-                    }}
-                  >
-                    <option value="7">Java 7 (Legacy)</option>
-                    <option value="8">Java 8 (LTS)</option>
-                    <option value="11">Java 11 (LTS)</option>
-                    <option value="17">Java 17 (LTS)</option>
-                    <option value="21">Java 21 (LTS)</option>
-                  </select>
-                  <div style={{ fontSize: 11, color: "#a16207", marginTop: 6 }}>
-                    💡 Select the correct Java version for your project. This will be used as the source version for migration.
-                  </div>
-                </div>
-              )}
             </div>
           <div style={styles.field}>
             <label style={styles.label}>Target Java Version</label>

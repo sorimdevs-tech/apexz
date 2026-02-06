@@ -1,8 +1,9 @@
-"""
+""" 
 Java Migration Backend - Main FastAPI Application
 Handles Java 7 → Java 18 migration automation using OpenRewrite
 """
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+import sys
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.responses import Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,7 +13,20 @@ from enum import Enum
 import uuid
 import os
 import re
+import logging
 from datetime import datetime, timezone
+
+# Force unbuffered output for immediate logging
+sys.stdout.reconfigure(line_buffering=True)
+
+# Configure verbose logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%H:%M:%S',
+    force=True
+)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -33,6 +47,23 @@ app = FastAPI(
     description="End-to-end Java 7 → Java 18 migration automation using OpenRewrite",
     version="1.0.0"
 )
+
+# Custom middleware to log all HTTP requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    client_host = request.client.host if request.client else "unknown"
+    method = request.method
+    url = str(request.url)
+    
+    print(f"[HTTP] {method} {url} - From: {client_host}")
+    sys.stdout.flush()
+    
+    response = await call_next(request)
+    
+    print(f"[HTTP] {method} {url} - Status: {response.status_code}")
+    sys.stdout.flush()
+    
+    return response
 
 # Register auth router
 app.include_router(auth_router, prefix="/api")
@@ -299,6 +330,76 @@ async def get_file_content(repo_url: str, file_path: str, token: str = ""):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/github/update-java-version")
+async def update_java_version(repo_url: str, java_version: str, file_path: str, token: str = ""):
+    """Update Java version in pom.xml or build.gradle file"""
+    try:
+        effective_token = token.strip() if token and token.strip() else DEFAULT_GITHUB_TOKEN
+        owner, repo = await github_service.parse_repo_url(repo_url)
+        
+        # Clone repository
+        clone_path = await github_service.clone_repository(effective_token, repo_url)
+        
+        # Update the file
+        file_full_path = os.path.join(clone_path, file_path)
+        if not os.path.exists(file_full_path):
+            raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+        
+        with open(file_full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Update Java version based on file type
+        if file_path.endswith('pom.xml'):
+            # Update <java.version> or <maven.compiler.source>/<maven.compiler.target>
+            import re
+            new_content = content
+            
+            # Update java.version property
+            java_version_pattern = r'<java\.version>([^<]+)</java\.version>'
+            new_content = re.sub(java_version_pattern, f'<java.version>{java_version}</java.version>', new_content)
+            
+            # Update maven.compiler.source
+            source_pattern = r'<maven\.compiler\.source>([^<]+)</maven.compiler.source>'
+            new_content = re.sub(source_pattern, f'<maven.compiler.source>{java_version}</maven.compiler.source>', new_content)
+            
+            # Update maven.compiler.target
+            target_pattern = r'<maven\.compiler\.target>([^<]+)</maven.compiler.target>'
+            new_content = re.sub(target_pattern, f'<maven.compiler.target>{java_version}</maven.compiler.target>', new_content)
+            
+        elif file_path.endswith('build.gradle') or file_path.endswith('build.gradle.kts'):
+            # Update sourceCompatibility/targetCompatibility
+            import re
+            new_content = content
+            
+            # Update sourceCompatibility
+            source_pattern = r"sourceCompatibility\s*=\s*['\"](\d+)['\"]"
+            new_content = re.sub(source_pattern, f"sourceCompatibility = '{java_version}'", new_content)
+            
+            # Update targetCompatibility
+            target_pattern = r"targetCompatibility\s*=\s*['\"](\d+)['\"]"
+            new_content = re.sub(target_pattern, f"targetCompatibility = '{java_version}'", new_content)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Only pom.xml and build.gradle are supported")
+        
+        # Write updated content
+        with open(file_full_path, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        
+        return {
+            "success": True,
+            "file_path": file_path,
+            "java_version": java_version,
+            "message": f"Java version updated to {java_version} in {file_path}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"[update-java-version ERROR] {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # GitLab Endpoints

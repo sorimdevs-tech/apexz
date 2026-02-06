@@ -383,3 +383,28 @@ export async function analyzeFossaForRepo(repoUrl: string, token: string = ""): 
   }
   return response.json();
 }
+
+// Update Java version in pom.xml or build.gradle
+export interface UpdateJavaVersionResponse {
+  success: boolean;
+  file_path: string;
+  java_version: string;
+  message: string;
+}
+
+export async function updateJavaVersion(
+  repoUrl: string, 
+  javaVersion: string, 
+  filePath: string, 
+  token: string = ""
+): Promise<UpdateJavaVersionResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/github/update-java-version?repo_url=${encodeURIComponent(repoUrl)}&java_version=${encodeURIComponent(javaVersion)}&file_path=${encodeURIComponent(filePath)}&token=${encodeURIComponent(token)}`,
+    { method: 'POST' }
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to update Java version');
+  }
+  return response.json();
+}

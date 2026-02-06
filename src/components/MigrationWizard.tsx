@@ -124,6 +124,8 @@ export default function MigrationWizard({ onBackToHome }: { onBackToHome?: () =>
   const [userSelectedVersion, setUserSelectedVersion] = useState<string | null>(null);
   // Track if no version was detected/selected
   const [sourceVersionStatus, setSourceVersionStatus] = useState<"detected" | "not_selected" | "unknown">("unknown");
+  // Track if user confirmed and wants to update pom.xml
+  const [updateSourceVersion, setUpdateSourceVersion] = useState(false);
 
   // Code diff viewer states for Result page
   const [codeChanges, setCodeChanges] = useState<{
@@ -197,13 +199,20 @@ export default function MigrationWizard({ onBackToHome }: { onBackToHome?: () =>
       const animationInterval = setInterval(() => {
         setAnimationProgress(prev => {
           const actualProgress = migrationJob?.progress_percent || 0;
+          const status = migrationJob?.status;
+          
+          // If migration is completed, go to 100%
+          if (status === "completed") {
+            return 100;
+          }
+          
           // Smoothly catch up to actual progress, or animate forward if backend is slow
           if (actualProgress > prev) {
             return actualProgress;
           }
-          // Animate forward slowly if backend hasn't updated yet (max 85% before completion)
-          if (prev < 85 && migrationJob?.status !== "completed" && migrationJob?.status !== "failed") {
-            return Math.min(prev + 2, 85);
+          // Animate forward slowly if backend hasn't updated yet (go to 100% when completed)
+          if (status !== "completed" && status !== "failed") {
+            return Math.min(prev + 2, 100);
           }
           return prev;
         });
@@ -869,6 +878,19 @@ public class UserService {
               setRepoUrl(e.target.value);
               setSelectedRepo(null);
               setRepoAnalysis(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && urlValidation.valid) {
+                setSelectedRepo({
+                  name: urlValidation.normalizedUrl.split('/').pop() || "",
+                  full_name: urlValidation.normalizedUrl.replace('https://github.com/', ''),
+                  url: urlValidation.normalizedUrl,
+                  default_branch: "main",
+                  language: "Java",
+                  description: ""
+                });
+                setStep(2);
+              }
             }}
             placeholder="https://github.com/owner/repository"
           />
@@ -2308,18 +2330,50 @@ public class UserService {
                 fontWeight: userSelectedVersion ? 600 : 500
               }}>
                 {userSelectedVersion
-                  ? `Java ${selectedSourceVersion}`
-                  : (repoAnalysis?.java_version_detected_from_build === false ? "Source don't have a java version" : "Source version not detected")
+                  ? `Java ${selectedSourceVersion} (manually selected)`
+                  : (repoAnalysis?.java_version && repoAnalysis?.java_version !== "unknown"
+                      ? `Java ${repoAnalysis.java_version} (detected)`
+                      : "Source don't have a java version")
                 }
               </div>
               <p style={styles.helpText}>
                 {userSelectedVersion
-                  ? "Source version selected in discovery"
-                  : (repoAnalysis?.java_version_detected_from_build === false
-                      ? "No Java version specified in build files - migration will analyze source code to detect version"
-                      : "No version selected in discovery - migration will start from Java 1")
+                  ? "Source version manually selected in discovery step"
+                  : (repoAnalysis?.java_version && repoAnalysis?.java_version !== "unknown"
+                      ? "Java version detected from build configuration"
+                      : "No Java version found - please select a source version below")
                 }
               </p>
+              {/* Show version selector when not detected */}
+              {!userSelectedVersion && (!repoAnalysis?.java_version || repoAnalysis?.java_version === "unknown") && (
+                <div style={{ marginTop: 12 }}>
+                  <select
+                    value={selectedSourceVersion}
+                    onChange={(e) => {
+                      setSelectedSourceVersion(e.target.value);
+                      setUserSelectedVersion(e.target.value); // Mark as user-selected
+                    }}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 6,
+                      border: "1px solid #d97706",
+                      fontSize: 14,
+                      backgroundColor: "#fff",
+                      cursor: "pointer",
+                      width: "100%"
+                    }}
+                  >
+                    <option value="7">Java 7 (Legacy)</option>
+                    <option value="8">Java 8 (LTS)</option>
+                    <option value="11">Java 11 (LTS)</option>
+                    <option value="17">Java 17 (LTS)</option>
+                    <option value="21">Java 21 (LTS)</option>
+                  </select>
+                  <div style={{ fontSize: 11, color: "#a16207", marginTop: 6 }}>
+                    💡 Select the correct Java version for your project. This will be used as the source version for migration.
+                  </div>
+                </div>
+              )}
             </div>
           <div style={styles.field}>
             <label style={styles.label}>Target Java Version</label>
@@ -3858,85 +3912,83 @@ public class UserService {
           </div>
          )}
 
-            {/* FOSSA License & Dependency Report */}
-            {((runFossa || migrationJob?.fossa_policy_status != null || migrationJob?.fossa_total_dependencies != null || fossaResult) && (migrationJob || fossaResult)) && (<div style={styles.reportSection}>
-  <h3 style={styles.reportTitle}>📜 FOSSA License & Dependency Scan</h3>
+    {/* FOSSA License & Dependency Report */}
+    {(runFossa || migrationJob?.fossa_policy_status != null || migrationJob?.fossa_total_dependencies != null || fossaResult) && (migrationJob || fossaResult) && (
+    <div style={styles.reportSection}>
+      <h3 style={styles.reportTitle}>📜 FOSSA License & Dependency Scan</h3>
 
-  <div style={styles.sonarqubeGrid}>
-    
-    {/* Policy Status */}
-    <div style={styles.sonarqubeItem}>
-      <div style={styles.qualityGate}>
+      <div style={styles.sonarqubeGrid}>
+        
+        {/* Policy Status */}
+        <div style={styles.sonarqubeItem}>
+          <div style={styles.qualityGate}>
             <span
-          style={{
-            ...styles.gateStatus,
-            backgroundColor:
-              ((fossaResult?.compliance_status ?? migrationJob?.fossa_policy_status) === "PASSED")
-                    ? "#22c55e"
-                    : "#ef4444",
-          }}
-        >
-              {(fossaResult?.compliance_status ?? migrationJob?.fossa_policy_status) || "N/A"}
-        </span>
-        <span style={styles.gateLabel}>Policy Status</span>
-      </div>
-    </div>
+              style={{
+                ...styles.gateStatus,
+                backgroundColor: (fossaResult?.compliance_status ?? migrationJob?.fossa_policy_status ?? "") === "PASSED" ? "#22c55e" : "#ef4444",
+              }}
+            >
+              {(fossaResult?.compliance_status ?? migrationJob?.fossa_policy_status ?? "N/A")}
+            </span>
+            <span style={styles.gateLabel}>Policy Status</span>
+          </div>
+        </div>
 
-    {/* Dependency Count */}
-    <div style={styles.sonarqubeItem}>
-      <div style={styles.coverageMeter}>
-        <div style={styles.coverageCircle}>
-            <span style={styles.coveragePercent}>
-            {fossaLoading ? "Loading..." : (fossaResult?.total_dependencies ?? migrationJob?.fossa_total_dependencies ?? "N/A")}
-          </span>
-          <span style={styles.coverageLabel}>Dependencies</span>
+        {/* Dependency Count */}
+        <div style={styles.sonarqubeItem}>
+          <div style={styles.coverageMeter}>
+            <div style={styles.coverageCircle}>
+              <span style={styles.coveragePercent}>
+                {fossaLoading ? "Loading..." : (fossaResult?.total_dependencies ?? migrationJob?.fossa_total_dependencies ?? "N/A")}
+              </span>
+              <span style={styles.coverageLabel}>Dependencies</span>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  {/* FOSSA Metrics */}
-  <div style={styles.qualityMetrics}>
-    
-    <div style={styles.metricItem}>
+      {/* FOSSA Metrics */}
+      <div style={styles.qualityMetrics}>
+        
+          <div style={styles.metricItem}>
+            <span
+              style={{
+                ...styles.metricValue,
+                color: ((fossaResult ? Object.values(fossaResult.licenses || {}).reduce((s: number, v: unknown) => s + (Number(v) || 0), 0) : (migrationJob?.fossa_license_issues ?? 0)) > 0) ? "#ef4444" : "#22c55e",
+              }}
+            >
+              {fossaLoading ? "Loading..." : (fossaResult ? Object.values(fossaResult.licenses || {}).reduce((s: number, v: unknown) => s + (Number(v) || 0), 0) : (migrationJob?.fossa_license_issues ?? 0))}
+            </span>
+            <span style={styles.metricLabel}>License Issues</span>
+          </div>
+
+        <div style={styles.metricItem}>
           <span
-        style={{
-          ...styles.metricValue,
-          color: ((fossaResult ? (Object.values(fossaResult.licenses || {}).reduce((s: any, v: any) => s + (Number(v)||0), 0)) : (migrationJob?.fossa_license_issues ?? 0)) > 0) ? "#ef4444" : "#22c55e",
-        }}
-      >
-        {fossaLoading ? "Loading..." : (fossaResult ? (Object.values(fossaResult.licenses || {}).reduce((s: any, v: any) => s + (Number(v)||0), 0)) : (migrationJob?.fossa_license_issues ?? 0))}
-      </span>
-      <span style={styles.metricLabel}>License Issues</span>
-    </div>
+            style={{
+              ...styles.metricValue,
+              color: (migrationJob?.fossa_vulnerabilities ?? 0) > 0 ? "#ef4444" : "#22c55e",
+            }}
+          >
+            {fossaLoading ? "Loading..." : fossaResult?.vulnerabilities ?? (migrationJob?.fossa_vulnerabilities ?? 0)}
+          </span>
+          <span style={styles.metricLabel}>Vulnerabilities</span>
+        </div>
 
-    <div style={styles.metricItem}>
-      <span
-        style={{
-          ...styles.metricValue,
-          color: (migrationJob?.fossa_vulnerabilities ?? 0) > 0 ? "#ef4444" : "#22c55e",
-        }}
-      >
-        {fossaLoading ? "Loading..." : (fossaResult ? (typeof fossaResult.vulnerabilities === 'number' ? fossaResult.vulnerabilities : Object.values(fossaResult.vulnerabilities || {}).reduce((s: any, v: any) => s + (Number(v)||0), 0)) : (migrationJob?.fossa_vulnerabilities ?? 0))}
-      </span>
-      <span style={styles.metricLabel}>Vulnerabilities</span>
-    </div>
+        <div style={styles.metricItem}>
+          <span
+            style={{
+              ...styles.metricValue,
+              color: (migrationJob?.fossa_outdated_dependencies ?? 0) > 0 ? "#f59e0b" : "#22c55e",
+            }}
+          >
+            {fossaLoading ? "Loading..." : (fossaResult?.outdated_dependencies ?? migrationJob?.fossa_outdated_dependencies ?? 0)}
+          </span>
+          <span style={styles.metricLabel}>Outdated Packages</span>
+        </div>
 
-    <div style={styles.metricItem}>
-      <span
-        style={{
-          ...styles.metricValue,
-          color: (migrationJob?.fossa_outdated_dependencies ?? 0) > 0 ? "#f59e0b" : "#22c55e",
-        }}
-      >
-        {fossaLoading ? "Loading..." : (fossaResult ? (fossaResult.outdated_dependencies ?? 0) : (migrationJob?.fossa_outdated_dependencies ?? 0))}
-      </span>
-      <span style={styles.metricLabel}>Outdated Packages</span>
+      </div>
     </div>
-
-  </div>
-</div>
-  )}
+    )}
 
           {/* Unit Test Report */}
           <div style={styles.reportSection}>

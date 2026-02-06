@@ -10,7 +10,7 @@ class FossaService:
         # Load API Key
         self.fossa_api_key = os.getenv("FOSSA_API_KEY")
         if not self.fossa_api_key:
-            print("❌ FOSSA_API_KEY not set. Run: export FOSSA_API_KEY=xxxx")
+            print("[WARN] FOSSA_API_KEY not set. Run: export FOSSA_API_KEY=xxxx")
 
         # Project Locator (Optional)
         self.project_locator = os.getenv(
@@ -26,7 +26,7 @@ class FossaService:
         if project_path is None:
             project_path = os.getcwd()
 
-        print(f"🚀 Starting FOSSA scan on: {project_path}")
+        print(f"[INFO] Starting FOSSA scan on: {project_path}")
 
         result = {
             "compliance_status": "UNKNOWN",
@@ -43,7 +43,7 @@ class FossaService:
 
         # Check CLI
         if not self._is_fossa_installed():
-            raise Exception("❌ FOSSA CLI NOT FOUND. Install: choco install fossa-cli or brew install fossa-cli")
+            raise Exception("[ERROR] FOSSA CLI NOT FOUND. Install: choco install fossa-cli or brew install fossa-cli")
 
         # Run FOSSA ANALYZE
         await self._run_fossa_analyze(project_path)
@@ -66,7 +66,7 @@ class FossaService:
     # RUN FOSSA ANALYZE
     # ----------------------------
     async def _run_fossa_analyze(self, path):
-        print("🔍 Running: fossa analyze")
+        print("[INFO] Running: fossa analyze")
 
         process = await asyncio.create_subprocess_exec(
             "fossa", "analyze",
@@ -79,15 +79,15 @@ class FossaService:
 
         if process.returncode != 0:
             print(stderr.decode())
-            raise Exception("❌ FOSSA analyze failed")
+            raise Exception("[ERROR] FOSSA analyze failed")
 
-        print("✅ Analyze completed")
+        print("[OK] Analyze completed")
 
     # ----------------------------
     # RUN FOSSA TEST JSON
     # ----------------------------
     async def _run_fossa_test(self, path) -> dict:
-        print("🛡️ Running: fossa test --json")
+        print("[INFO] Running: fossa test --json")
 
         process = await asyncio.create_subprocess_exec(
             "fossa", "test", "--json",
@@ -100,10 +100,10 @@ class FossaService:
 
         if process.returncode != 0:
             print(stderr.decode())
-            raise Exception("❌ FOSSA test failed")
+            raise Exception("[ERROR] FOSSA test failed")
 
         if not stdout:
-            raise Exception("❌ No JSON output from FOSSA")
+            raise Exception("[ERROR] No JSON output from FOSSA")
 
         return json.loads(stdout.decode())
 

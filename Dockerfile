@@ -10,13 +10,14 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Download and install Java 17 (Eclipse Temurin) directly
+# Install essential dependencies (including git)
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    git \
     wget \
     tar \
     && rm -rf /var/lib/apt/lists/*
 
-# Download Java 17 (Temurin)
+# Download and install Java 17 (Eclipse Temurin) directly
 RUN wget -q https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.11%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.11_9.tar.gz \
     && tar -xzf OpenJDK17U-jdk_x64_linux_hotspot_17.0.11_9.tar.gz -C /opt \
     && rm OpenJDK17U-jdk_x64_linux_hotspot_17.0.11_9.tar.gz

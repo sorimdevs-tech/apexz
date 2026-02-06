@@ -10,15 +10,28 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install system dependencies (with retry for reliability)
-RUN apt-get update -y || apt-get update -y || true
-RUN apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    openjdk-17-jdk \
-    maven \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# Download and install Java 17 (Eclipse Temurin) directly
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    wget \
+    tar \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download Java 17 (Temurin)
+RUN wget -q https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.11%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.11_9.tar.gz \
+    && tar -xzf OpenJDK17U-jdk_x64_linux_hotspot_17.0.11_9.tar.gz -C /opt \
+    && rm OpenJDK17U-jdk_x64_linux_hotspot_17.0.11_9.tar.gz
+
+# Set Java environment
+ENV JAVA_HOME=/opt/jdk-17.0.11+9
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# Download Maven directly
+RUN wget -q https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz \
+    && tar -xzf apache-maven-3.9.6-bin.tar.gz -C /opt \
+    && rm apache-maven-3.9.6-bin.tar.gz
+
+ENV MAVEN_HOME=/opt/apache-maven-3.9.6
+ENV PATH=$MAVEN_HOME/bin:$PATH
 
 # Copy backend files
 COPY java-migration-backend/Java_Migration_Accelerator_backend/java-migration-backend/requirements.txt .

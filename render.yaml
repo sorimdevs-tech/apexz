@@ -1,12 +1,12 @@
 services:
-  # Backend API Service
+  # Backend + Frontend combined (Dockerfile builds both)
   - type: web
-    name: java-migration-backend
+    name: java-migration-app
     runtime: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r java-migration-backend/Java_Migration_Accelerator_backend/java-migration-backend/requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     rootDir: java-migration-backend/Java_Migration_Accelerator_backend/java-migration-backend
-    dockerfilePath: Dockerfile.backend
+    dockerfilePath: ../Dockerfile
     envVars:
       - key: GITHUB_TOKEN
         sync: false
@@ -20,20 +20,3 @@ services:
         sync: false
       - key: PYTHONUNBUFFERED
         value: "1"
-
-  # Frontend Static Site
-  - type: web
-    name: java-migration-frontend
-    runtime: static
-    buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          name: java-migration-backend
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: no-cache

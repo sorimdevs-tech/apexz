@@ -653,10 +653,10 @@ class MigrationService:
         # Update pom.xml Java version (now it should exist)
         pom_path = os.path.join(project_path, "pom.xml")
         if os.path.exists(pom_path):
-            modified = await self._update_maven_java_version(pom_path, target_version)
+            modified = await self._update_maven_java_version(pom_path, source_version, target_version)
             if modified:
                 result["files_modified"] += 1
-                result["changes"].append("Updated pom.xml Java version")
+                result["changes"].append(f"Updated pom.xml: Java {source_version} → {target_version}")
 
         # Get recipes for migration path
         recipes = self._get_migration_recipes(source_version, target_version)
@@ -1368,8 +1368,8 @@ class ApplicationTest {{
                 except:
                     pass
     
-    async def _update_maven_java_version(self, pom_path: str, target_version: str) -> bool:
-        """Update Java version in pom.xml"""
+    async def _update_maven_java_version(self, pom_path: str, source_version: str, target_version: str) -> bool:
+        """Update Java version in pom.xml (both source and target)"""
         try:
             with open(pom_path, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -1377,15 +1377,15 @@ class ApplicationTest {{
             original_content = content
             modified = False
             
-            # Update maven.compiler.source and target (various formats)
+            # Update maven.compiler.source with source version and target with target version
             patterns_to_update = [
-                # Standard property format
+                # Standard property format - update both source and target
                 (r'<maven\.compiler\.source>[^<]+</maven\.compiler\.source>', 
                  f'<maven.compiler.source>{target_version}</maven.compiler.source>'),
                 (r'<maven\.compiler\.target>[^<]+</maven\.compiler\.target>', 
                  f'<maven.compiler.target>{target_version}</maven.compiler.target>'),
-                # java.version property
-                (r'<java\.version>[^<]+</java\.version>', 
+                # java.version property (set to target version)
+                (r'<Java\.version>[^<]+</java\.version>', 
                  f'<java.version>{target_version}</java.version>'),
                 # source/target in compiler plugin
                 (r'<source>1\.\d+</source>', f'<source>{target_version}</source>'),
